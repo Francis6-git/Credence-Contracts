@@ -49,7 +49,7 @@ pub enum DataKey {
     Attestation(u64),
     AttestationCounter,
     SubjectAttestations(Address),
-    /// Per-identity attestation count (updated on add/revoke).
+    /// Number of live, non-revoked attestation IDs in SubjectAttestations.
     SubjectAttestationCount(Address),
     /// Per-identity nonce for replay prevention.
     Nonce(Address),
@@ -238,9 +238,13 @@ impl CredenceBond {
 
         let count_key = DataKey::SubjectAttestationCount(subject.clone());
         let count: u32 = e.storage().instance().get(&count_key).unwrap_or(0);
-        e.storage()
-            .instance()
-            .set(&count_key, &count.saturating_add(1));
+        let next_count = count
+            .checked_add(1)
+            .expect("subject attestation count overflow");
+        if next_count != attestations.len() {
+            panic!("subject attestation index drift");
+        }
+        e.storage().instance().set(&count_key, &next_count);
 
         e.events().publish(
             (Symbol::new(&e, "attestation_added"), subject),
@@ -279,11 +283,36 @@ impl CredenceBond {
         };
         e.storage().instance().remove(&dedup_key);
 
+        let subject_key = DataKey::SubjectAttestations(attestation.identity.clone());
+        let mut attestations: Vec<u64> = e
+            .storage()
+            .instance()
+            .get(&subject_key)
+            .unwrap_or(Vec::new(&e));
+        let mut removed = false;
+        let mut i = 0;
+        while i < attestations.len() {
+            if attestations.get_unchecked(i) == attestation_id {
+                attestations.remove_unchecked(i);
+                removed = true;
+                break;
+            }
+            i += 1;
+        }
+        if !removed {
+            panic!("attestation index missing");
+        }
+        e.storage().instance().set(&subject_key, &attestations);
+
         let count_key = DataKey::SubjectAttestationCount(attestation.identity.clone());
         let count: u32 = e.storage().instance().get(&count_key).unwrap_or(0);
-        e.storage()
-            .instance()
-            .set(&count_key, &count.saturating_sub(1));
+        let next_count = count
+            .checked_sub(1)
+            .expect("subject attestation count underflow");
+        if next_count != attestations.len() {
+            panic!("subject attestation index drift");
+        }
+        e.storage().instance().set(&count_key, &next_count);
 
         e.events().publish(
             (
@@ -302,7 +331,7 @@ impl CredenceBond {
             .unwrap_or_else(|| panic!("attestation not found"))
     }
 
-    /// Get all attestation IDs for a subject.
+    /// Get live, non-revoked attestation IDs for a subject.
     pub fn get_subject_attestations(e: Env, subject: Address) -> Vec<u64> {
         e.storage()
             .instance()
@@ -310,7 +339,7 @@ impl CredenceBond {
             .unwrap_or(Vec::new(&e))
     }
 
-    /// Get attestation count for a subject (identity). O(1).
+    /// Get the O(1) count of live, non-revoked attestations for a subject.
     pub fn get_subject_attestation_count(e: Env, subject: Address) -> u32 {
         e.storage()
             .instance()
