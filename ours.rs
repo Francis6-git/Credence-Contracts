@@ -122,8 +122,10 @@ impl CredenceBond {
             .unwrap_or(false)
     }
 
-    /// Create or top-up a bond for an identity. In a full implementation this would
-    /// transfer USDC from the caller and store the bond.
+    /// Create or top-up a bond for an identity.
+    ///
+    /// Authority: `identity` must authorize this call.
+    /// In a full implementation this would transfer USDC from the caller and store the bond.
     pub fn create_bond(
         e: Env,
         identity: Address,
@@ -132,6 +134,7 @@ impl CredenceBond {
         is_rolling: bool,
         notice_period_duration: u64,
     ) -> IdentityBond {
+        identity.require_auth();
         let bond_start = e.ledger().timestamp();
 
         // Verify the end timestamp wouldn't overflow
@@ -357,14 +360,12 @@ impl CredenceBond {
     }
 
     /// Withdraw from bond. Checks that the bond has sufficient balance after accounting for slashed amount.
+    ///
+    /// Authority: stored bond owner (`bond.identity`) must authorize this call.
     /// Returns the updated bond with reduced bonded_amount.
     pub fn withdraw(e: Env, amount: i128) -> IdentityBond {
         let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+        let mut bond = Self::load_bond_and_require_owner_auth(&e, &key);
 
         // Calculate available balance (bonded - slashed)
         let available = bond
@@ -393,14 +394,12 @@ impl CredenceBond {
     }
 
     /// Withdraw before lock-up end; applies early exit penalty and transfers penalty to treasury.
+    ///
+    /// Authority: stored bond owner (`bond.identity`) must authorize this call.
     /// Net amount to user = amount - penalty. Use when lock-up has not yet ended.
     pub fn withdraw_early(e: Env, amount: i128) -> IdentityBond {
         let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+        let mut bond = Self::load_bond_and_require_owner_auth(&e, &key);
 
         let available = bond
             .bonded_amount
@@ -443,13 +442,11 @@ impl CredenceBond {
     }
 
     /// Request withdrawal (rolling bonds). Withdrawal allowed after notice period.
+    ///
+    /// Authority: stored bond owner (`bond.identity`) must authorize this call.
     pub fn request_withdrawal(e: Env) -> IdentityBond {
         let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+        let mut bond = Self::load_bond_and_require_owner_auth(&e, &key);
         if !bond.is_rolling {
             panic!("not a rolling bond");
         }
@@ -466,13 +463,11 @@ impl CredenceBond {
     }
 
     /// If bond is rolling and period has ended, renew (new period start = now). Emits renewal event.
+    ///
+    /// Authority: stored bond owner (`bond.identity`) must authorize this call.
     pub fn renew_if_rolling(e: Env) -> IdentityBond {
         let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+        let mut bond = Self::load_bond_and_require_owner_auth(&e, &key);
         if !bond.is_rolling {
             return bond;
         }
@@ -515,14 +510,12 @@ impl CredenceBond {
         slashing::slash_bond(&e, &admin, amount)
     }
 
-    /// Top up the bond with additional amount (checks for overflow)
+    /// Top up the bond with additional amount (checks for overflow).
+    ///
+    /// Authority: stored bond owner (`bond.identity`) must authorize this call.
     pub fn top_up(e: Env, amount: i128) -> IdentityBond {
         let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+        let mut bond = Self::load_bond_and_require_owner_auth(&e, &key);
 
         // Perform top-up with overflow protection
         bond.bonded_amount = bond
@@ -534,14 +527,12 @@ impl CredenceBond {
         bond
     }
 
-    /// Extend bond duration (checks for u64 overflow on timestamps)
+    /// Extend bond duration (checks for u64 overflow on timestamps).
+    ///
+    /// Authority: stored bond owner (`bond.identity`) must authorize this call.
     pub fn extend_duration(e: Env, additional_duration: u64) -> IdentityBond {
         let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+        let mut bond = Self::load_bond_and_require_owner_auth(&e, &key);
 
         // Perform duration extension with overflow protection
         bond.bond_duration = bond
@@ -748,6 +739,16 @@ impl CredenceBond {
     fn check_lock(e: &Env) -> bool {
         let key = Symbol::new(e, "locked");
         e.storage().instance().get(&key).unwrap_or(false)
+    }
+
+    fn load_bond_and_require_owner_auth(e: &Env, key: &DataKey) -> IdentityBond {
+        let bond: IdentityBond = e
+            .storage()
+            .instance()
+            .get(key)
+            .unwrap_or_else(|| panic!("no bond"));
+        bond.identity.require_auth();
+        bond
     }
 }
 
