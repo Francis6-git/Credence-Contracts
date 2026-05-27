@@ -301,6 +301,8 @@ impl CredenceBond {
     }
 
     /// Withdraw from bond. Checks that the bond has sufficient balance after accounting for slashed amount.
+    /// For rolling bonds, requires a prior `request_withdrawal` call and that
+    /// `now >= withdrawal_requested_at + notice_period` has elapsed.
     /// Returns the updated bond with reduced bonded_amount.
     ///
     /// Errors:
@@ -315,6 +317,20 @@ impl CredenceBond {
             .instance()
             .get::<_, IdentityBond>(&key)
             .unwrap_or_else(|| panic_with_error!(e, ContractError::BondNotFound));
+
+        // Rolling bonds must have completed the notice window before funds can leave.
+        if bond.is_rolling {
+            if bond.withdrawal_requested_at == 0 {
+                panic!("withdrawal not requested");
+            }
+            let earliest = bond
+                .withdrawal_requested_at
+                .checked_add(bond.notice_period)
+                .expect("notice period overflow");
+            if e.ledger().timestamp() < earliest {
+                panic!("notice period not elapsed");
+            }
+        }
 
         // Calculate available balance (bonded - slashed)
         let available = bond
@@ -442,6 +458,10 @@ impl CredenceBond {
             .get::<_, IdentityBond>(&key)
             .unwrap_or_else(|| panic_with_error!(e, ContractError::BondNotFound));
         if !bond.is_rolling {
+            return bond;
+        }
+        // Do not auto-renew once the holder has signalled intent to withdraw.
+        if bond.withdrawal_requested_at != 0 {
             return bond;
         }
         let now = e.ledger().timestamp();
@@ -583,6 +603,22 @@ impl CredenceBond {
         if !bond.active {
             Self::release_lock(&e);
             panic_with_error!(e, ContractError::BondNotActive);
+        }
+
+        // Rolling bonds must have completed the notice window before funds can leave.
+        if bond.is_rolling {
+            if bond.withdrawal_requested_at == 0 {
+                Self::release_lock(&e);
+                panic!("withdrawal not requested");
+            }
+            let earliest = bond
+                .withdrawal_requested_at
+                .checked_add(bond.notice_period)
+                .expect("notice period overflow");
+            if e.ledger().timestamp() < earliest {
+                Self::release_lock(&e);
+                panic!("notice period not elapsed");
+            }
         }
 
         let withdraw_amount = bond.bonded_amount - bond.slashed_amount;
