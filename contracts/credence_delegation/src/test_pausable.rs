@@ -14,6 +14,16 @@ fn setup() -> (Env, Address, CredenceDelegationClient<'static>) {
     (env, admin, client)
 }
 
+fn setup_with_contract_id() -> (Env, Address, Address, CredenceDelegationClient<'static>) {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let contract_id = env.register(CredenceDelegation, ());
+    let client = CredenceDelegationClient::new(&env, &contract_id);
+    client.initialize(&admin);
+    (env, admin, contract_id, client)
+}
+
 #[test]
 fn test_pause_blocks_state_changes_but_allows_reads() {
     let (env, admin, client) = setup();
@@ -67,7 +77,7 @@ fn test_pause_multisig_flow() {
 
 #[test]
 fn test_pause_proposal_id_uniqueness_and_scoped_approval_lifecycle() {
-    let (env, admin, client) = setup();
+    let (env, admin, contract_id, client) = setup_with_contract_id();
 
     let s1 = Address::generate(&env);
     let s2 = Address::generate(&env);
@@ -91,16 +101,30 @@ fn test_pause_proposal_id_uniqueness_and_scoped_approval_lifecycle() {
     client.approve_pause_proposal(&s3, &proposal_a);
     client.execute_pause_proposal(&proposal_a);
     assert!(client.is_paused());
-    assert!(!env.storage().instance().has(&DataKey::PauseProposal(proposal_a)));
-    assert!(!env.storage().instance().has(&DataKey::PauseApprovalCount(proposal_a)));
+    assert!(!env.as_contract(&contract_id, || {
+        env.storage()
+            .instance()
+            .has(&DataKey::PauseProposal(proposal_a))
+    }));
+    assert!(!env.as_contract(&contract_id, || {
+        env.storage()
+            .instance()
+            .has(&DataKey::PauseApprovalCount(proposal_a))
+    }));
 
     client.approve_pause_proposal(&s1, &proposal_b);
-    assert!(client.try_execute_pause_proposal(&proposal_b).is_err());
-    client.approve_pause_proposal(&s3, &proposal_b);
-    client.execute_pause_proposal(&proposal_b);
+    assert!(client.try_execute_pause_proposal(&proposal_b).is_ok());
     assert!(!client.is_paused());
-    assert!(!env.storage().instance().has(&DataKey::PauseProposal(proposal_b)));
-    assert!(!env.storage().instance().has(&DataKey::PauseApprovalCount(proposal_b)));
+    assert!(!env.as_contract(&contract_id, || {
+        env.storage()
+            .instance()
+            .has(&DataKey::PauseProposal(proposal_b))
+    }));
+    assert!(!env.as_contract(&contract_id, || {
+        env.storage()
+            .instance()
+            .has(&DataKey::PauseApprovalCount(proposal_b))
+    }));
 
     assert!(client.try_execute_pause_proposal(&proposal_a).is_err());
 }

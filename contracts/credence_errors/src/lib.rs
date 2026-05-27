@@ -55,7 +55,7 @@ pub enum ErrorCategory {
 ///   500 - 599 : Delegation
 ///   600 - 699 : Treasury
 ///   700 - 799 : Arithmetic
-#[contracterror]
+#[contracterror(export = false)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ContractError {
