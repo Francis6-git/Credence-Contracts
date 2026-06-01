@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Rolling Bond Type
 //!
 //! Auto-renews at period end unless withdrawal was requested with notice.
@@ -6,10 +5,8 @@
 
 use crate::IdentityBond;
 
-/// Returns true if the bond has passed its period end (bond_start + bond_duration).
-#[must_use]
 pub fn is_period_ended(now: u64, bond_start: u64, bond_duration: u64) -> bool {
-    let end = period_end(bond_start, bond_duration);
+    let end = bond_start.checked_add(bond_duration).expect("overflow");
     now >= end
 }
 
@@ -38,16 +35,4 @@ pub fn apply_renewal(bond: &mut IdentityBond, new_start: u64) {
 #[must_use]
 pub fn period_end(start: u64, duration: u64) -> u64 {
     start.saturating_add(duration)
-=======
-use crate::IdentityBond;
-
-pub fn is_period_ended(now: u64, bond_start: u64, bond_duration: u64) -> bool {
-    bond_start
-        .checked_add(bond_duration)
-        .is_some_and(|end| now >= end)
-}
-
-pub fn apply_renewal(bond: &mut IdentityBond, now: u64) {
-    bond.bond_start = now;
->>>>>>> main
 }
