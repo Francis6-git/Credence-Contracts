@@ -452,10 +452,6 @@ impl ErrorExt for ContractError {
             }
             ContractError::ReentrancyDetected => "Reentrancy detected; call rejected",
             ContractError::InvalidNonce => "Nonce is replayed or out of order",
-            ContractError::DomainMismatch => "Payload domain tag does not match the expected delegated action",
-            ContractError::OwnerMismatch => "Payload owner does not match the expected caller owner",
-            ContractError::TargetMismatch => "Payload target does not match the expected action target",
-            ContractError::ContractIdMismatch => "Payload contract_id does not match the current contract address",
             ContractError::NegativeStake => "Attester stake cannot be negative",
             ContractError::EarlyExitConfigNotSet => {
                 "Early-exit configuration has not been set for this bond"
