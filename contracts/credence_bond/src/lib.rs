@@ -11,6 +11,14 @@ mod weighted_attestation;
 #[path = "types/mod.rs"]
 pub mod types;
 
+/// Reusable bond-invariant assertion library (test-only).
+#[cfg(test)]
+pub mod test_invariants;
+
+/// Tests exercising the reusable bond-invariant library (test-only).
+#[cfg(test)]
+mod test_invariants_usage;
+
 use credence_errors::ContractError;
 use soroban_sdk::{
     contract, contractimpl, contracttype, panic_with_error, Address, Env, IntoVal, String, Symbol,
@@ -42,45 +50,6 @@ pub struct IdentityBond {
 }
 
 
-fn release_lock(e: &Env) {
-    storage::set_lock(e, false);
-}
-
-/// Internal validator for bond construction.
-fn validate_and_create_bond_struct(
-    e: &Env,
-    identity: Address,
-    amount: i128,
-    duration: u64,
-    is_rolling: bool,
-    notice_period_duration: u64,
-) -> Result<Bond, ContractError> {
-    if !is_valid_bond(amount) {
-        return Err(ContractError::InvalidBondAmount);
-    }
-
-    if duration == 0 {
-        return Err(ContractError::InvalidBondDuration);
-    }
-
-    if is_rolling && (notice_period_duration == 0 || notice_period_duration > duration) {
-        return Err(ContractError::InvalidNoticePeriod);
-    }
-
-    e.ledger().timestamp()
-        .checked_add(duration)
-        .ok_or(ContractError::Overflow)?;
-
-    Ok(Bond {
-        identity,
-        amount,
-        bond_start: e.ledger().timestamp(),
-        duration,
-        is_rolling,
-        notice_period_duration,
-    })
-}
-
 // Re-export attestation type for external callers.
 pub use types::Attestation;
 
@@ -98,6 +67,7 @@ pub enum DataKey {
     AttesterStake(Address),
     WeightConfig,
     EarlyExitConfig,
+    GraceWindow,
 }
 
 const STORAGE_TTL_EXTEND_TO: u32 = 31_536_000;
@@ -323,7 +293,7 @@ impl CredenceBond {
             if e.ledger().timestamp() < earliest {
                 panic!("notice period not elapsed");
             }
-        } else if now < bond.bond_start + bond.duration {
+        } else if e.ledger().timestamp() < bond.bond_start.saturating_add(bond.bond_duration) {
             panic_with_error!(e, ContractError::LockupNotExpired);
         }
 
