@@ -1,10 +1,15 @@
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use anyhow::{Result, anyhow};
 use soroban_client::{Client, Transaction, XdrCodec};
 
 /// CLI for Credence admin operations.
 #[derive(Parser)]
-#[command(name = "credence-admin", author, version, about = "Admin CLI for Credence protocol")]
+#[command(
+    name = "credence-admin",
+    author,
+    version,
+    about = "Admin CLI for Credence protocol"
+)]
 struct Cli {
     /// Submit the transaction instead of dry run.
     #[arg(long, action = clap::ArgAction::SetTrue, default_value = "false")]
@@ -23,10 +28,7 @@ enum Commands {
         bps: u32,
     },
     /// Set weight configuration for a bond.
-    BondSetWeights {
-        bond_id: String,
-        weight: u32,
-    },
+    BondSetWeights { bond_id: String, weight: u32 },
     /// Set pause signer for delegation.
     DelegationSetPauseSigner {
         delegation_id: String,
@@ -46,28 +48,41 @@ fn main() -> Result<()> {
         Commands::BondSetWeights { bond_id, weight } => {
             handle_bond_set_weights(&client, &bond_id, weight, cli.submit)
         }
-        Commands::DelegationSetPauseSigner { delegation_id, signer } => {
-            handle_delegation_set_pause(&client, &delegation_id, &signer, cli.submit)
-        }
+        Commands::DelegationSetPauseSigner {
+            delegation_id,
+            signer,
+        } => handle_delegation_set_pause(&client, &delegation_id, &signer, cli.submit),
     }
 }
 
-fn handle_bond_set_early_exit(client: &Client, bond_id: &str, bps: u32, submit: bool) -> Result<()> {
+fn handle_bond_set_early_exit(
+    client: &Client,
+    bond_id: &str,
+    bps: u32,
+    submit: bool,
+) -> Result<()> {
     // Build transaction (placeholder implementation).
     let tx = Transaction::new();
     // Encode XDR.
-    let xdr = tx.to_xdr()?
-        .map_err(|e| anyhow!(e))?;
+    let xdr = tx.to_xdr()?.map_err(|e| anyhow!(e))?;
     if submit {
         client.submit_transaction(&tx)?;
-        println!("Transaction submitted for bond {} early exit config", bond_id);
+        println!(
+            "Transaction submitted for bond {} early exit config",
+            bond_id
+        );
     } else {
         println!("Dry run XDR: {}", base64::encode(&xdr));
     }
     Ok(())
 }
 
-fn handle_bond_set_weights(client: &Client, bond_id: &str, weight: u32, submit: bool) -> Result<()> {
+fn handle_bond_set_weights(
+    client: &Client,
+    bond_id: &str,
+    weight: u32,
+    submit: bool,
+) -> Result<()> {
     let tx = Transaction::new();
     let xdr = tx.to_xdr()?.map_err(|e| anyhow!(e))?;
     if submit {
@@ -79,12 +94,20 @@ fn handle_bond_set_weights(client: &Client, bond_id: &str, weight: u32, submit: 
     Ok(())
 }
 
-fn handle_delegation_set_pause(client: &Client, delegation_id: &str, signer: &str, submit: bool) -> Result<()> {
+fn handle_delegation_set_pause(
+    client: &Client,
+    delegation_id: &str,
+    signer: &str,
+    submit: bool,
+) -> Result<()> {
     let tx = Transaction::new();
     let xdr = tx.to_xdr()?.map_err(|e| anyhow!(e))?;
     if submit {
         client.submit_transaction(&tx)?;
-        println!("Transaction submitted for delegation {} pause signer", delegation_id);
+        println!(
+            "Transaction submitted for delegation {} pause signer",
+            delegation_id
+        );
     } else {
         println!("Dry run XDR: {}", base64::encode(&xdr));
     }

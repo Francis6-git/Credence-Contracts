@@ -348,7 +348,6 @@ pub enum ContractError {
     // Note: DomainMismatch (218), OwnerMismatch (219), TargetMismatch (220),
     // ContractIdMismatch (221), and SignatureExpired (222) are shared Bond/Delegation
     // variants defined in the Bond section above.
-
     /// Unknown or unsupported signature scheme tag.
     /// Contracts: delegation
     /// Wire-stable: do not renumber this error code.
@@ -529,8 +528,14 @@ impl ErrorExt for ContractError {
             | ContractError::FlashLoanRepaymentFailed => ErrorCategory::Treasury,
 
             ContractError::Overflow | ContractError::Underflow => ErrorCategory::Arithmetic,
-            ContractError::NoPendingAdmin | ContractError::InvalidAdminAddress | ContractError::AdminUnchanged | ContractError::TimelockNotReady => ErrorCategory::Authorization,
-            ContractError::DomainMismatch | ContractError::OwnerMismatch | ContractError::TargetMismatch | ContractError::ContractIdMismatch => ErrorCategory::Delegation,
+            ContractError::NoPendingAdmin
+            | ContractError::InvalidAdminAddress
+            | ContractError::AdminUnchanged
+            | ContractError::TimelockNotReady => ErrorCategory::Authorization,
+            ContractError::DomainMismatch
+            | ContractError::OwnerMismatch
+            | ContractError::TargetMismatch
+            | ContractError::ContractIdMismatch => ErrorCategory::Delegation,
         }
     }
 
@@ -646,8 +651,3 @@ impl ErrorExt for ContractError {
 
 #[cfg(test)]
 mod test_errors;
-
-
-
-
-

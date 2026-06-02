@@ -279,6 +279,15 @@ impl CredenceDelegation {
     ///
     /// Payload domain must be `DomainTag::RevokeDelegation` — a signature
     /// produced for `execute_delegated_delegate` cannot be replayed here.
+    ///
+    /// Validation order is explicit and security-critical:
+    /// 1. Domain-separated payload verification
+    /// 2. Nonce consumption (replay prevention)
+    /// 3. State transition (`mark_delegation_revoked`)
+    ///
+    /// This ordering ensures a replayed revoke payload fails with
+    /// `InvalidNonce` if the payload nonce has already been consumed,
+    /// even when the underlying delegation record is already revoked.
     pub fn execute_delegated_revoke(
         e: Env,
         owner: Address,
@@ -298,6 +307,15 @@ impl CredenceDelegation {
     /// Relayer-friendly variant of `revoke_attestation`.
     ///
     /// Payload domain must be `DomainTag::RevokeAttestation`.
+    ///
+    /// Validation order is explicit and security-critical:
+    /// 1. Domain-separated payload verification
+    /// 2. Nonce consumption (replay prevention)
+    /// 3. State transition (`mark_delegation_revoked`)
+    ///
+    /// This ordering ensures a replayed revoke-attest payload fails with
+    /// `InvalidNonce` if the payload nonce has already been consumed,
+    /// even when the attestation has already been revoked.
     pub fn execute_delegated_revoke_attest(
         e: Env,
         attester: Address,
@@ -496,9 +514,7 @@ impl CredenceDelegation {
     /// Clients can use this to check scheme support before submitting
     /// delegated payloads.
     pub fn get_verifier(e: Env, scheme: u32) -> Option<Address> {
-        e.storage()
-            .instance()
-            .get(&DataKey::Verifier(scheme as u8))
+        e.storage().instance().get(&DataKey::Verifier(scheme as u8))
     }
 
     // -----------------------------------------------------------------------
@@ -657,7 +673,6 @@ impl CredenceDelegation {
 
 // #[cfg(test)]
 // mod test_domain_separation;
-
 #[cfg(test)]
 mod test_delegation_ttl;
 

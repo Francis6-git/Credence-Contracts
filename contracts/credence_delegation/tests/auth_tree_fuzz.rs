@@ -1,11 +1,11 @@
 #![cfg(test)]
 
+use credence_bond::{CredenceBond, CredenceBondClient};
+use credence_delegation::{CredenceDelegation, CredenceDelegationClient};
 use soroban_sdk::{
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     vec, Address, Env, IntoVal, String, Symbol,
 };
-use credence_delegation::{CredenceDelegation, CredenceDelegationClient};
-use credence_bond::{CredenceBond, CredenceBondClient};
 
 /// A proxy contract to simulate the cross-contract auth tree.
 #[soroban_sdk::contract]
@@ -28,7 +28,7 @@ impl AuthProxy {
 
 fn setup(e: &Env) -> (Address, Address, Address, Address) {
     let admin = Address::generate(e);
-    
+
     let delegation_id = e.register_contract(None, CredenceDelegation);
     let delegation_client = CredenceDelegationClient::new(e, &delegation_id);
     delegation_client.initialize(&admin);
@@ -53,16 +53,31 @@ fn test_auth_tree_valid() {
     let root_invoke = MockAuthInvoke {
         contract_id: proxy_id.clone(),
         fn_name: Symbol::new(&e, "delegated_action"),
-        args: vec![&e, bond_id.to_val(), owner.to_val(), subject.to_val(), 0_u64.into_val(&e)],
-        sub_invokes: vec![&e, MockAuth {
-            address: owner.clone(),
-            invoke: MockAuthInvoke {
-                contract_id: bond_id.clone(),
-                fn_name: Symbol::new(&e, "add_attestation"),
-                args: vec![&e, owner.to_val(), subject.to_val(), String::from_str(&e, "fuzz_data").to_val(), 0_u64.into_val(&e)],
-                sub_invokes: vec![&e],
-            }
-        }],
+        args: vec![
+            &e,
+            bond_id.to_val(),
+            owner.to_val(),
+            subject.to_val(),
+            0_u64.into_val(&e),
+        ],
+        sub_invokes: vec![
+            &e,
+            MockAuth {
+                address: owner.clone(),
+                invoke: MockAuthInvoke {
+                    contract_id: bond_id.clone(),
+                    fn_name: Symbol::new(&e, "add_attestation"),
+                    args: vec![
+                        &e,
+                        owner.to_val(),
+                        subject.to_val(),
+                        String::from_str(&e, "fuzz_data").to_val(),
+                        0_u64.into_val(&e),
+                    ],
+                    sub_invokes: vec![&e],
+                },
+            },
+        ],
     };
 
     e.mock_auths(&[MockAuth {
@@ -85,7 +100,13 @@ fn test_auth_tree_missing_leaf() {
         invoke: MockAuthInvoke {
             contract_id: proxy_id.clone(),
             fn_name: Symbol::new(&e, "delegated_action"),
-            args: vec![&e, bond_id.to_val(), owner.to_val(), subject.to_val(), 0_u64.into_val(&e)],
+            args: vec![
+                &e,
+                bond_id.to_val(),
+                owner.to_val(),
+                subject.to_val(),
+                0_u64.into_val(&e),
+            ],
             sub_invokes: vec![&e],
         },
     }]);

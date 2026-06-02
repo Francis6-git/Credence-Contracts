@@ -90,7 +90,13 @@ fn test_expiry_boundary_lower_reject_minus_1_static() {
     let delegate = Address::generate(&e);
     let expires_at = now.saturating_sub(1); // now - 1
 
-    client.delegate(&owner, &delegate, &DelegationType::Attestation, &expires_at, &0_u64);
+    client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
 }
 
 #[test]
@@ -104,7 +110,13 @@ fn test_expiry_boundary_lower_reject_exact_0_static() {
     let delegate = Address::generate(&e);
     let expires_at = now; // exactly now
 
-    client.delegate(&owner, &delegate, &DelegationType::Attestation, &expires_at, &0_u64);
+    client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
 }
 
 #[test]
@@ -117,7 +129,13 @@ fn test_expiry_boundary_lower_accept_plus_1_static() {
     let delegate = Address::generate(&e);
     let expires_at = now.saturating_add(1); // now + 1
 
-    let d = client.delegate(&owner, &delegate, &DelegationType::Attestation, &expires_at, &0_u64);
+    let d = client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
     assert_eq!(d.expires_at, expires_at);
     assert!(client.is_valid_delegate(&owner, &delegate, &DelegationType::Attestation));
 }
@@ -145,7 +163,13 @@ fn test_expiry_boundary_lower_monotonic_advance_rejects_minus_1() {
 
     // Try to delegate with expires_at = current_now - 1 = 1000 (should reject)
     let expires_at = 1000_u64;
-    client.delegate(&owner, &delegate2, &DelegationType::Attestation, &expires_at, &0_u64);
+    client.delegate(
+        &owner,
+        &delegate2,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
 }
 
 #[test]
@@ -197,7 +221,13 @@ fn test_expiry_boundary_lower_jump_forward_rejects_stale() {
 
     // Try expires_at = old reference (1500) which is now in the past
     let expires_at = 1500_u64;
-    client.delegate(&owner, &delegate, &DelegationType::Attestation, &expires_at, &0_u64);
+    client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
 }
 
 #[test]
@@ -211,7 +241,13 @@ fn test_expiry_boundary_lower_jump_forward_accepts_future() {
 
     // expires_at relative to current time (5000 + 100 = 5100)
     let expires_at = 5100_u64;
-    let d = client.delegate(&owner, &delegate, &DelegationType::Attestation, &expires_at, &0_u64);
+    let d = client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
 
     assert_eq!(d.expires_at, expires_at);
     assert!(client.is_valid_delegate(&owner, &delegate, &DelegationType::Attestation));
@@ -231,7 +267,13 @@ fn test_expiry_boundary_lower_backward_forward_uses_latest() {
 
     // Must use 3000 as 'now', so expires_at=2500 (before 3000) should reject
     let expires_at = 2500_u64;
-    client.delegate(&owner, &delegate, &DelegationType::Attestation, &expires_at, &0_u64);
+    client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expires_at,
+        &0_u64,
+    );
 }
 
 // ============================================================================
@@ -254,7 +296,13 @@ fn test_expiry_boundary_upper_accept_max_minus_1_static() {
         .saturating_add(MAX_DELEGATION_DURATION)
         .saturating_sub(1);
 
-    let d = client.delegate(&owner, &delegate, &DelegationType::Management, &expires_at, &0_u64);
+    let d = client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Management,
+        &expires_at,
+        &0_u64,
+    );
 
     assert_eq!(d.expires_at, expires_at);
     assert!(client.is_valid_delegate(&owner, &delegate, &DelegationType::Management));
@@ -270,7 +318,13 @@ fn test_expiry_boundary_upper_accept_max_exact_static() {
     let delegate = Address::generate(&e);
     let expires_at = now.saturating_add(MAX_DELEGATION_DURATION);
 
-    let d = client.delegate(&owner, &delegate, &DelegationType::Management, &expires_at, &0_u64);
+    let d = client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Management,
+        &expires_at,
+        &0_u64,
+    );
 
     assert_eq!(d.expires_at, expires_at);
     assert!(client.is_valid_delegate(&owner, &delegate, &DelegationType::Management));
@@ -289,7 +343,13 @@ fn test_expiry_boundary_upper_reject_max_plus_1_static() {
         .saturating_add(MAX_DELEGATION_DURATION)
         .saturating_add(1);
 
-    client.delegate(&owner, &delegate, &DelegationType::Management, &expires_at, &0_u64);
+    client.delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Management,
+        &expires_at,
+        &0_u64,
+    );
 }
 
 #[test]
@@ -315,7 +375,8 @@ fn test_expiry_boundary_upper_monotonic_advance_accepts_max() {
 
     // Create multiple delegations, each at limit of current window
     for i in 0..3 {
-        e.ledger().with_mut(|li| li.timestamp = 1000 + i as u64 * 100);
+        e.ledger()
+            .with_mut(|li| li.timestamp = 1000 + i as u64 * 100);
 
         let delegate = Address::generate(&e);
         let now = e.ledger().timestamp();
@@ -356,7 +417,9 @@ fn test_expiry_boundary_upper_monotonic_advance_rejects_over_max() {
     e.ledger().with_mut(|li| li.timestamp = 2000);
     let delegate2 = Address::generate(&e);
     let now = e.ledger().timestamp();
-    let expires_at = now.saturating_add(MAX_DELEGATION_DURATION).saturating_add(1);
+    let expires_at = now
+        .saturating_add(MAX_DELEGATION_DURATION)
+        .saturating_add(1);
 
     client.delegate(
         &owner,
@@ -570,7 +633,8 @@ fn test_expiry_boundary_delegated_monotonic_advance_valid_sequence() {
     let owner = Address::generate(&e);
 
     for i in 0..5 {
-        e.ledger().with_mut(|li| li.timestamp = 1000 + i as u64 * 100);
+        e.ledger()
+            .with_mut(|li| li.timestamp = 1000 + i as u64 * 100);
 
         let delegate = Address::generate(&e);
         let now = e.ledger().timestamp();
@@ -740,13 +804,7 @@ fn test_expiry_boundary_exact_equality_now_rejects() {
     let owner = Address::generate(&e);
     let delegate = Address::generate(&e);
 
-    let result = client.try_delegate(
-        &owner,
-        &delegate,
-        &DelegationType::Attestation,
-        &42,
-        &0_u64,
-    );
+    let result = client.try_delegate(&owner, &delegate, &DelegationType::Attestation, &42, &0_u64);
 
     assert!(result.is_err());
 }
@@ -778,7 +836,8 @@ fn test_expiry_boundary_saturation_at_u64_max_ledger_time() {
     let (e, client) = setup();
 
     // Set ledger to near u64::MAX
-    e.ledger().with_mut(|li| li.timestamp = u64::MAX.saturating_sub(1000));
+    e.ledger()
+        .with_mut(|li| li.timestamp = u64::MAX.saturating_sub(1000));
 
     let owner = Address::generate(&e);
     let delegate = Address::generate(&e);

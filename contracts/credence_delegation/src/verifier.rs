@@ -16,9 +16,7 @@
 //! break existing signatures. When adding new schemes, append at the end only.
 
 use credence_errors::ContractError;
-use soroban_sdk::{
-    contracttype, panic_with_error, Address, Bytes, Env, Symbol,
-};
+use soroban_sdk::{contracttype, panic_with_error, Address, Bytes, Env, Symbol};
 
 /// Supported signature schemes for delegated action signatures.
 ///
@@ -112,13 +110,7 @@ pub trait SignatureVerifier: Send + Sync {
     /// - Success: Returns normally (no panic)
     /// - Verification failure: Panics with an appropriate error
     /// - Invalid format: Panics with scheme-specific error
-    fn verify(
-        &self,
-        e: &Env,
-        owner: &Address,
-        message: &Bytes,
-        signature: &Bytes,
-    );
+    fn verify(&self, e: &Env, owner: &Address, message: &Bytes, signature: &Bytes);
 }
 
 /// Storage of a registered verifier implementation.
@@ -151,20 +143,14 @@ pub struct VerifierRegisteredEvent {
 }
 
 /// Emit a `verifier_registered` event for audit trail tracking.
-pub fn emit_verifier_registered(
-    e: &Env,
-    scheme: u32,
-    verifier_id: &Address,
-    admin: &Address,
-) {
+pub fn emit_verifier_registered(e: &Env, scheme: u32, verifier_id: &Address, admin: &Address) {
     let event = VerifierRegisteredEvent {
         scheme,
         verifier_id: verifier_id.clone(),
         admin: admin.clone(),
     };
 
-    e.events()
-        .publish(("verifier", "registered"), event);
+    e.events().publish(("verifier", "registered"), event);
 }
 
 /// Validate that a scheme is known and supported.

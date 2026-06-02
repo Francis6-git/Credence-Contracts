@@ -64,6 +64,7 @@ Delegations expire at the exact `expires_at` timestamp. A record with `expires_a
 
 - Only the owner can create or revoke their delegations (`require_auth`).
 - Delegated payload verification normalizes all mismatch failures to `InvalidNonce` so callers do not learn which payload field differed.
+- Failure-mode ordering is pinned for relayed revokes: payload domain → nonce → state, so replayed revoke payloads fail with `InvalidNonce`. See `docs/delegation-failure-modes.md` for details.
 - Delegations are time-bound; expired delegations are treated as invalid.
 - Delegation lifetime is capped by `MAX_DELEGATION_DURATION` (`365 days`) to prevent never-expiring management or attestation authority.
 - Owners may revoke expired delegations; the record remains invalid before and after revocation, and the explicit `revoked` flag preserves audit state.

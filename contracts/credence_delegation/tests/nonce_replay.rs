@@ -18,8 +18,7 @@
 //! * The first post-invalidation nonce `new_nonce` is accepted.
 
 use credence_delegation::{
-    CredenceDelegation, CredenceDelegationClient,
-    DelegatedActionPayload, DomainTag, DelegationType,
+    CredenceDelegation, CredenceDelegationClient, DelegatedActionPayload, DelegationType, DomainTag,
 };
 use soroban_sdk::{testutils::Address as _, Address, Env};
 
@@ -144,7 +143,10 @@ fn boundary_last_invalidated_nonce_rejected() {
         &(e.ledger().timestamp() + 86_400),
         &make_delegate_payload(&identity, &delegate, &client.address, 49),
     );
-    assert!(result.is_err(), "nonce 49 (last in [0,50)) must be rejected");
+    assert!(
+        result.is_err(),
+        "nonce 49 (last in [0,50)) must be rejected"
+    );
 }
 
 /// The first nonce after the invalidated range (`new_nonce`) must be accepted.
@@ -189,7 +191,10 @@ fn boundary_double_invalidation_still_rejects_old_nonces() {
             &(e.ledger().timestamp() + 86_400),
             &make_delegate_payload(&identity, &delegate, &client.address, n),
         );
-        assert!(result.is_err(), "nonce {n} must be rejected after two invalidations");
+        assert!(
+            result.is_err(),
+            "nonce {n} must be rejected after two invalidations"
+        );
     }
 }
 
@@ -205,7 +210,10 @@ fn boundary_non_monotone_invalidation_fails() {
 
     // Trying to set new_nonce = 5 (equal, not greater) must fail.
     let result = client.try_invalidate_nonce_range(&identity, &5);
-    assert!(result.is_err(), "new_nonce <= stored_nonce must be rejected");
+    assert!(
+        result.is_err(),
+        "new_nonce <= stored_nonce must be rejected"
+    );
 
     // Trying to set new_nonce = 3 (less than) must also fail.
     let result = client.try_invalidate_nonce_range(&identity, &3);
@@ -239,7 +247,10 @@ fn boundary_post_invalidation_nonce_consumed_once() {
         &(e.ledger().timestamp() + 86_400),
         &make_delegate_payload(&identity, &delegate, &client.address, 100),
     );
-    assert!(result.is_err(), "replaying nonce 100 after it was consumed must fail");
+    assert!(
+        result.is_err(),
+        "replaying nonce 100 after it was consumed must fail"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -251,11 +262,10 @@ fn boundary_post_invalidation_nonce_consumed_once() {
 /// - `span` is the size of the invalidated range (1..=MAX_NONCE_INVALIDATION_SPAN).
 /// - `offset` is the nonce to test — must be in `[current, current + span)`.
 fn nonce_triple() -> impl Strategy<Value = (u64, u64, u64)> {
-    (0u64..1_000u64, 1u64..=10_000u64)
-        .prop_flat_map(|(current, span)| {
-            let offset_strat = 0u64..span;
-            (Just(current), Just(span), offset_strat)
-        })
+    (0u64..1_000u64, 1u64..=10_000u64).prop_flat_map(|(current, span)| {
+        let offset_strat = 0u64..span;
+        (Just(current), Just(span), offset_strat)
+    })
 }
 
 proptest! {

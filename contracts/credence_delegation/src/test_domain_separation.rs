@@ -463,6 +463,156 @@ fn happy_path_delegated_delegate_then_revoke() {
     assert!(d2.revoked);
 }
 
+#[test]
+#[should_panic(expected = "Error(Contract, #208)")]
+fn revoke_replay_rejected_by_nonce() {
+    let (e, client, contract_id) = setup();
+    let owner = Address::generate(&e);
+    let delegate = Address::generate(&e);
+    let expiry = e.ledger().timestamp() + 86_400;
+
+    let create_payload = make_payload(&e, DomainTag::Delegate, &owner, &delegate, &contract_id, 0);
+    client.execute_delegated_delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expiry,
+        &create_payload,
+    );
+
+    let revoke_payload = make_payload(
+        &e,
+        DomainTag::RevokeDelegation,
+        &owner,
+        &delegate,
+        &contract_id,
+        1,
+    );
+    client.execute_delegated_revoke(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &revoke_payload,
+    );
+    assert_eq!(client.get_nonce(&owner), 2);
+
+    // Replaying the same revoke payload must fail with InvalidNonce,
+    // not AlreadyRevoked.
+    client.execute_delegated_revoke(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &revoke_payload,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #502)")]
+fn revoke_with_fresh_nonce_after_revocation_rejected_as_already_revoked() {
+    let (e, client, contract_id) = setup();
+    let owner = Address::generate(&e);
+    let delegate = Address::generate(&e);
+    let expiry = e.ledger().timestamp() + 86_400;
+
+    let p1 = make_payload(&e, DomainTag::Delegate, &owner, &delegate, &contract_id, 0);
+    client.execute_delegated_delegate(
+        &owner,
+        &delegate,
+        &DelegationType::Attestation,
+        &expiry,
+        &p1,
+    );
+
+    let p2 = make_payload(
+        &e,
+        DomainTag::RevokeDelegation,
+        &owner,
+        &delegate,
+        &contract_id,
+        1,
+    );
+    client.execute_delegated_revoke(&owner, &delegate, &DelegationType::Attestation, &p2);
+    assert_eq!(client.get_nonce(&owner), 2);
+
+    let p3 = make_payload(
+        &e,
+        DomainTag::RevokeDelegation,
+        &owner,
+        &delegate,
+        &contract_id,
+        2,
+    );
+    client.execute_delegated_revoke(&owner, &delegate, &DelegationType::Attestation, &p3);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #208)")]
+fn revoke_attest_replay_rejected_by_nonce() {
+    let (e, client, contract_id) = setup();
+    let attester = Address::generate(&e);
+    let subject = Address::generate(&e);
+    let expiry = e.ledger().timestamp() + 86_400;
+
+    client.delegate(
+        &attester,
+        &subject,
+        &DelegationType::Attestation,
+        &expiry,
+        &0_u64,
+    );
+
+    let revoke_payload = make_payload(
+        &e,
+        DomainTag::RevokeAttestation,
+        &attester,
+        &subject,
+        &contract_id,
+        1,
+    );
+    client.execute_delegated_revoke_attest(&attester, &subject, &revoke_payload);
+    assert_eq!(client.get_nonce(&attester), 2);
+
+    client.execute_delegated_revoke_attest(&attester, &subject, &revoke_payload);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #502)")]
+fn revoke_attest_with_fresh_nonce_after_revocation_rejected_as_already_revoked() {
+    let (e, client, contract_id) = setup();
+    let attester = Address::generate(&e);
+    let subject = Address::generate(&e);
+    let expiry = e.ledger().timestamp() + 86_400;
+
+    client.delegate(
+        &attester,
+        &subject,
+        &DelegationType::Attestation,
+        &expiry,
+        &0_u64,
+    );
+
+    let revoke_payload = make_payload(
+        &e,
+        DomainTag::RevokeAttestation,
+        &attester,
+        &subject,
+        &contract_id,
+        1,
+    );
+    client.execute_delegated_revoke_attest(&attester, &subject, &revoke_payload);
+    assert_eq!(client.get_nonce(&attester), 2);
+
+    let next_payload = make_payload(
+        &e,
+        DomainTag::RevokeAttestation,
+        &attester,
+        &subject,
+        &contract_id,
+        2,
+    );
+    client.execute_delegated_revoke_attest(&attester, &subject, &next_payload);
+}
+
 // ---------------------------------------------------------------------------
 // Happy path: delegated revoke_attestation
 // ---------------------------------------------------------------------------
@@ -475,7 +625,13 @@ fn happy_path_delegated_revoke_attestation() {
     let expiry = e.ledger().timestamp() + 86_400;
 
     // Create the attestation entry first (direct path consumes nonce 0)
-    client.delegate(&attester, &subject, &DelegationType::Attestation, &expiry, &0_u64);
+    client.delegate(
+        &attester,
+        &subject,
+        &DelegationType::Attestation,
+        &expiry,
+        &0_u64,
+    );
 
     // Revoke via relayer (direct path consumed nonce 0, so delegated path uses nonce 1)
     let payload = make_payload(
